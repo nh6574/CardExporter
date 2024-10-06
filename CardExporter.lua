@@ -46,22 +46,52 @@ local function conver_to_hex(colour_table)
 end
 
 local function output_image(card)
-    if output_images and G.ASSET_ATLAS and G.ASSET_ATLAS[card.atlas] and G.ASSET_ATLAS[card.atlas].image_data then
-        local file_path = "output/images/" .. card.key:gsub("?", "_") .. ".png"
-        local w = G.ASSET_ATLAS[card.atlas].px * 2
-        local h = G.ASSET_ATLAS[card.atlas].py * 2
-        local newImageData = love.image.newImageData(w, h)
-        newImageData:paste(G.ASSET_ATLAS[card.atlas].image_data, 0, 0, card.pos.x * w, card.pos.y * h, w, h)
-        if card.soul_pos then
-            newImageData:paste(G.ASSET_ATLAS[card.atlas].image_data, 0, 0, card.soul_pos.x * w, card.soul_pos.y * h, w, h)
-            if card.soul_pos.extra then
-                newImageData:paste(G.ASSET_ATLAS[card.atlas].image_data, 0, 0, card.soul_pos.extra.x * w, card.soul_pos.extra.y * h, w, h)
+    if not card.atlas and card.set then
+        card.atlas = card.set
+    end
+    if output_images and G.ASSET_ATLAS and G.ASSET_ATLAS[card.atlas] and not G.ASSET_ATLAS[card.atlas].image_data then
+        for _,v in ipairs(G.asset_atli) do
+            if v.name == card.set then
+                local sprite_path = v.path
+                G.ASSET_ATLAS[card.atlas].image_data = love.image.newImageData(sprite_path)
             end
         end
+    end
+    if output_images and G.ASSET_ATLAS and G.ASSET_ATLAS[card.atlas] and G.ASSET_ATLAS[card.atlas].image_data then
+        local file_path = "output/images/" .. card.key:gsub("?", "_") .. ".png"
+        local file_path_soul = "output/images/" .. card.key:gsub("?", "_") .. "_soul.png"
+        local file_path_extra = "output/images/" .. card.key:gsub("?", "_") .. "_extra.png"
+        local w = G.ASSET_ATLAS[card.atlas].px * G.SETTINGS.GRAPHICS.texture_scaling
+        local h = G.ASSET_ATLAS[card.atlas].py * G.SETTINGS.GRAPHICS.texture_scaling
+        local newImageData = love.image.newImageData(w, h)
+        local newImageDataSoul = nil
+        local newImageDataExtra = nil
+        newImageData:paste(G.ASSET_ATLAS[card.atlas].image_data, 0, 0, card.pos.x * w, card.pos.y * h, w, h)
+        if card.soul_pos then
+            newImageDataSoul = love.image.newImageData(w, h)
+            newImageDataSoul:paste(G.ASSET_ATLAS[card.atlas].image_data, 0, 0, card.soul_pos.x * w, card.soul_pos.y * h, w, h)
+            if card.soul_pos.extra then
+                newImageDataExtra = love.image.newImageData(w, h)
+                newImageDataExtra:paste(G.ASSET_ATLAS[card.atlas].image_data, 0, 0, card.soul_pos.extra.x * w, card.soul_pos.extra.y * h, w, h)
+            end
+        end
+
         if love.filesystem.exists(file_path) then
             love.filesystem.remove(file_path)
         end
         newImageData:encode("png", file_path)
+        if newImageDataSoul then
+            if love.filesystem.exists(file_path_soul) then
+                love.filesystem.remove(file_path_soul)
+            end
+            newImageDataSoul:encode("png", file_path_soul)
+        end
+        if newImageDataExtra then
+            if love.filesystem.exists(file_path_extra) then
+                love.filesystem.remove(file_path_extra)
+            end
+            newImageDataExtra:encode("png", file_path_extra)
+        end
     end
 end
 
@@ -607,6 +637,12 @@ end
 
 G.FUNCS.create_output = function(e)
     local card = nil
+    if not love.filesystem.exists("output") then
+        love.filesystem.createDirectory("output")
+    end
+    if not love.filesystem.exists("output/images") then
+        love.filesystem.createDirectory("output/images")
+    end
 
     for k,v in pairs(G.P_CENTERS) do
         print("Processing " .. k .. " | " .. tostring(v.set))
