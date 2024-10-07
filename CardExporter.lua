@@ -773,8 +773,7 @@ G.FUNCS.create_output = function(e)
     if love.filesystem.exists("output/cards.json") then
         love.filesystem.remove("output/cards.json")
     end
-    love.filesystem.write("output/cards.json", output)
-    print(tprint(G.SHADERS))
+    love.filesystem.write("output/cards.js", "cards = " .. output:gsub("'","\\'"))   --outputting to js file/object to get around browser security annoyances
 end
 
 -------------------------------------------------
