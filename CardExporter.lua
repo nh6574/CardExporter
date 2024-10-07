@@ -119,8 +119,6 @@ local function output_rendered_image(card)
             local edition_key = card.edition.key
             if edition_key and SMODS.Centers[edition_key] and G.SHADERS[SMODS.Centers[edition_key].shader] then
                 love.graphics.setShader(G.SHADERS[SMODS.Centers[edition_key].shader])
-            else
-                print(tprint(card))
             end
         end
     end
@@ -178,11 +176,26 @@ end
 
 local function process_joker(card, center)
     local item = {}
+    local badges = {}
+    local custom_rarity = ""
     if card.ability_UIBox_table then
         item.name = get_name_from_table(card.ability_UIBox_table.name)
         item.description = get_desc_from_table(card.ability_UIBox_table.main)
+        if center.set_card_type_badge then
+            center:set_card_type_badge(card, badges)
+        end
     end
-    item.rarity = ({localize('k_common'), localize('k_uncommon'), localize('k_rare'), localize('k_legendary'), localize('k_fusion'), ['cry_epic'] = 'Epic', ['cry_exotic'] = 'Exotic', ['cere_divine'] = 'Divine', ['evo'] = 'Evolved'})[card.rarity]
+    if  badges[1] and 
+        badges[1].nodes[1] and 
+        badges[1].nodes[1].nodes[2] and 
+        badges[1].nodes[1].nodes[2].config.object.config.string and 
+        badges[1].nodes[1].nodes[2].config.object.config.string[1] then
+        custom_rarity = badges[1].nodes[1].nodes[2].config.object.config.string[1]
+    end
+    item.rarity = ({localize('k_common'), localize('k_uncommon'), localize('k_rare'), localize('k_legendary'), localize('k_fusion'), ['cry_epic'] = 'Epic', ['cry_exotic'] = 'Exotic', ['cere_divine'] = 'Divine', ['evo'] = 'Evolved'})[center.rarity]
+    if custom_rarity ~= "" then
+        item.rarity = custom_rarity
+    end
     item.key = center.key
     item.set = center.set
     if center.mod then
