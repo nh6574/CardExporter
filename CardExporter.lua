@@ -59,13 +59,13 @@ local function output_image(card)
     end
     if output_images and G.ASSET_ATLAS and G.ASSET_ATLAS[card.atlas] and G.ASSET_ATLAS[card.atlas].image_data then
         local file_path = "output/images/" .. card.key:gsub("?", "_") .. ".png"
-        local file_path_soul = "output/images/" .. card.key:gsub("?", "_") .. "_soul.png"
-        local file_path_extra = "output/images/" .. card.key:gsub("?", "_") .. "_extra.png"
-        local w = G.ASSET_ATLAS[card.atlas].px * G.SETTINGS.GRAPHICS.texture_scaling
-        local h = G.ASSET_ATLAS[card.atlas].py * G.SETTINGS.GRAPHICS.texture_scaling
+        local w = (G.ASSET_ATLAS[card.atlas].px * G.SETTINGS.GRAPHICS.texture_scaling)
+        local h = (G.ASSET_ATLAS[card.atlas].py * G.SETTINGS.GRAPHICS.texture_scaling)
         local newImageData = love.image.newImageData(w, h)
         local newImageDataSoul = nil
         local newImageDataExtra = nil
+
+        local canvas = love.graphics.newCanvas(w, h, {type = '2d', readable = true})
         newImageData:paste(G.ASSET_ATLAS[card.atlas].image_data, 0, 0, card.pos.x * w, card.pos.y * h, w, h)
         if card.soul_pos then
             newImageDataSoul = love.image.newImageData(w, h)
@@ -76,23 +76,68 @@ local function output_image(card)
             end
         end
 
+        love.graphics.push()
+        local prevcanvas = love.graphics.getCanvas()
+        love.graphics.setColor( 255, 255, 255, 255 )
+        canvas = love.graphics.newCanvas(w, h)
+        love.graphics.setCanvas( canvas)
+           love.graphics.draw(love.graphics.newImage(newImageData),0,0)
+        if newImageDataSoul then
+            love.graphics.draw(love.graphics.newImage(newImageDataSoul), 0,0)
+            if newImageDataExtra then
+                love.graphics.draw(love.graphics.newImage(newImageDataExtra), 0,0)
+            end
+        end
+        love.graphics.setCanvas( prevcanvas )
+        newImageData = canvas:newImageData( )
+        love.graphics.pop()
+
         if love.filesystem.exists(file_path) then
             love.filesystem.remove(file_path)
         end
         newImageData:encode("png", file_path)
-        if newImageDataSoul then
-            if love.filesystem.exists(file_path_soul) then
-                love.filesystem.remove(file_path_soul)
+    end
+end
+
+local function output_rendered_image(card)
+    local file_path = "output/images/" .. card.config.center.key:gsub("?", "_") .. ".png"
+    local w = 71 * G.SETTINGS.GRAPHICS.texture_scaling
+    local h = 95 * G.SETTINGS.GRAPHICS.texture_scaling
+
+    local canvas = love.graphics.newCanvas(w, h, {type = '2d', readable = true})
+    love.graphics.push()
+    local oldCanvas = love.graphics.getCanvas()
+    love.graphics.setCanvas( canvas )
+
+    love.graphics.clear(0,0,0,0)
+    love.graphics.setColor(1, 1, 1, 1)
+
+    if card.edition and card.edition.type and G.SHADERS[card.edition.type]  then
+        love.graphics.setShader(G.SHADERS[card.edition.type])
+    else
+        if card.edition then
+            local edition_key = card.edition.key
+            if edition_key and SMODS.Centers[edition_key] and G.SHADERS[SMODS.Centers[edition_key].shader] then
+                love.graphics.setShader(G.SHADERS[SMODS.Centers[edition_key].shader])
+            else
+                print(tprint(card))
             end
-            newImageDataSoul:encode("png", file_path_soul)
-        end
-        if newImageDataExtra then
-            if love.filesystem.exists(file_path_extra) then
-                love.filesystem.remove(file_path_extra)
-            end
-            newImageDataExtra:encode("png", file_path_extra)
         end
     end
+    love.graphics.draw(
+        card.children.center.atlas.image,
+        card.children.center.sprite,
+        0,0,0,2,2
+    )
+
+    love.graphics.setShader()
+    love.graphics.setCanvas(oldCanvas)
+    love.graphics.pop()
+
+    if love.filesystem.exists(file_path) then
+        love.filesystem.remove(file_path)
+    end
+    canvas:newImageData():encode('png', file_path)
 end
 
 local function get_name_from_table(table)
@@ -133,9 +178,6 @@ end
 
 local function process_joker(card, center)
     local item = {}
-    if center.key == "j_jen_arachnid" then
-        print(tprint(center))
-    end
     if card.ability_UIBox_table then
         item.name = get_name_from_table(card.ability_UIBox_table.name)
         item.description = get_desc_from_table(card.ability_UIBox_table.main)
@@ -147,7 +189,7 @@ local function process_joker(card, center)
         item.mod = center.mod.id
     end
     item.tags = {}
-    item.image_url = "output/images/" .. center.key:gsub("?", "_") .. ".png"
+    item.image_url = "images/" .. center.key:gsub("?", "_") .. ".png"
     if item.name then
         sets["Joker"][item.key] = item
     end
@@ -169,7 +211,7 @@ local function process_consumable(card, center)
             item.mod = center.mod.id
         end
         item.tags = {}
-        item.image_url = "output/images/" .. center.key:gsub("?", "_") .. ".png"
+        item.image_url = "images/" .. center.key:gsub("?", "_") .. ".png"
         if item.name then
             sets["Consumables"][item.set][item.key] = item
         end
@@ -188,7 +230,7 @@ local function process_other(card, center)
         item.mod = center.mod.id
     end
     item.tags = {}
-    item.image_url = "output/images/" .. center.key:gsub("?", "_") .. ".png"
+    item.image_url = "images/" .. center.key:gsub("?", "_") .. ".png"
     if item.name then
         sets[item.set][item.key] = item
     end
@@ -212,7 +254,7 @@ local function process_playing_card(card, center, key)
         item.mod = center.mod.id
     end
     item.tags = {}
-    item.image_url = "output/images/" .. key:gsub("?", "_") .. ".png"
+    item.image_url = "images/" .. key:gsub("?", "_") .. ".png"
     if item.name then
         sets["PlayingCards"][item.set][item.key] = item
     end
@@ -263,7 +305,7 @@ local function process_blind(blind)
             item.mod = blind.mod.id
         end
         item.tags = {}
-        item.image_url = "output/images/" .. blind.key:gsub("?", "_") .. ".png"
+        item.image_url = "images/" .. blind.key:gsub("?", "_") .. ".png"
         if item.name then
             sets["Blind"][item.key] = item
         end
@@ -294,7 +336,7 @@ local function process_curse(curse)
             item.mod = "JeffDeluxeConsumablesPack"
         end
         item.tags = {}
-        item.image_url = "output/images/" .. curse.key:gsub("?", "_") .. ".png"
+        item.image_url = "images/" .. curse.key:gsub("?", "_") .. ".png"
         if item.name then
             sets["Curse"][item.key] = item
         end
@@ -322,7 +364,7 @@ local function process_d6_side(d6_side)
             item.mod = d6_side.mod.id
         end
         item.tags = {}
-        item.image_url = "output/images/" .. d6_side.key:gsub("?", "_") .. ".png"
+        item.image_url = "images/" .. d6_side.key:gsub("?", "_") .. ".png"
         if item.name then
             sets["D6 Side"][item.key] = item
         end
@@ -332,7 +374,7 @@ end
 local function process_edition(card)
     local item = {}
     local center = card.config.center
-    output_image(center)
+    output_rendered_image(card)
     if card.ability_UIBox_table then
        item.name = get_name_from_table(card.ability_UIBox_table.name)
        item.description = get_desc_from_table(card.ability_UIBox_table.main)
@@ -343,7 +385,7 @@ local function process_edition(card)
         item.mod = center.mod.id
     end
     item.tags = {}
-    item.image_url = "output/images/" .. center.key:gsub("?", "_") .. ".png"
+    item.image_url = "images/" .. center.key:gsub("?", "_") .. ".png"
     if item.name then
         sets[item.set][item.key] = item
     end
@@ -363,7 +405,7 @@ local function process_enhancement(card)
         item.mod = center.mod.id
     end
     item.tags = {}
-    item.image_url = "output/images/" .. center.key:gsub("?", "_") .. ".png"
+    item.image_url = "images/" .. center.key:gsub("?", "_") .. ".png"
     if item.name then
         sets[item.set][item.key] = item
     end
@@ -382,7 +424,7 @@ local function process_seal(card, seal)
         item.mod = seal.mod.id
     end
     item.tags = {}
-    item.image_url = "output/images/" .. seal.key:gsub("?", "_") .. ".png"
+    item.image_url = "images/" .. seal.key:gsub("?", "_") .. ".png"
     if item.name then
         sets[item.set][item.key] = item
     end
@@ -430,7 +472,7 @@ local function process_sticker(center)
         item.mod = center.mod.id
     end
     item.tags = {}
-    item.image_url = "output/images/" .. center.key:gsub("?", "_") .. ".png"
+    item.image_url = "images/" .. center.key:gsub("?", "_") .. ".png"
     if item.name then
         sets["Sticker"][item.key] = item
         print(tprint(item))
@@ -450,7 +492,7 @@ local function process_tag(tag)
         item.mod = tag.mod.id
     end
     item.tags = {}
-    item.image_url = "output/images/" .. tag.key:gsub("?", "_") .. ".png"
+    item.image_url = "images/" .. tag.key:gsub("?", "_") .. ".png"
     if item.name then
         sets["Tag"][item.key] = item
     end
@@ -587,53 +629,6 @@ function config_export_tab()
         },
     }
 end
-
---G.P_BLINDS,
---G.P_TAGS,
---G.P_SEALS,
---G.P_STAKES,
---G.P_STICKERS,
---G.P_BOOSTERS,
---G.P_SUITS,
---G.P_SKILLS,
---G.P_D6_SIDES,
---G.P_D6_EDITIONS,
---G.P_CARDS,
-
--- Letter
--- jen_exconsumable
--- Back
--- jen_tokens
--- Sleeve
--- Planet
--- Stellar
--- potion
--- Alchemical
--- Contract
--- Colour
--- Familiar_Tarots
--- Cine
--- EGO_Gift
--- Booster
--- Familiar_Planets
--- Lunar
--- Spell
--- Polymino
--- Voucher
--- Familiar_Spectrals
--- Ability
--- Tarot
--- jen_jokerability
--- Spectral
--- Joker
--- Bonus
--- Code
--- Enhanced
--- Other
--- Action
--- Edition
--- Default
--- complete
 
 G.FUNCS.create_output = function(e)
     local card = nil
@@ -779,6 +774,7 @@ G.FUNCS.create_output = function(e)
         love.filesystem.remove("output/cards.json")
     end
     love.filesystem.write("output/cards.json", output)
+    print(tprint(G.SHADERS))
 end
 
 -------------------------------------------------
