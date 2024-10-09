@@ -11,6 +11,8 @@
 NFS.load("Mods/CardExporter/ca.lua")() --third party json library
 local json = require "json"
 
+local output_root = "output/"
+local copy_command = 'xcopy "Mods\\CardExporter\\Template" "' .. output_root .. '" /Y /S /I'
 local output_images = true
 local output_on_hover = false
 
@@ -36,7 +38,11 @@ sets["Mods"] = {}
 sets["PlayingCards"] = {}
 sets["Suit"] = {}
 
-local function conver_to_hex(colour_table)
+local function copy_template()
+    os.execute(copy_command)
+end
+
+local function convert_to_hex(colour_table)
     if not colour_table then return end
     local colour = "#" ..
         string.format("%02x", colour_table[1] * 255) ..
@@ -58,7 +64,7 @@ local function output_image(card)
         end
     end
     if output_images and G.ASSET_ATLAS and G.ASSET_ATLAS[card.atlas] and G.ASSET_ATLAS[card.atlas].image_data then
-        local file_path = "output/images/" .. card.key:gsub("?", "_") .. ".png"
+        local file_path = output_root .. "images/" .. card.key:gsub("?", "_") .. ".png"
         local w = (G.ASSET_ATLAS[card.atlas].px * G.SETTINGS.GRAPHICS.texture_scaling)
         local h = (G.ASSET_ATLAS[card.atlas].py * G.SETTINGS.GRAPHICS.texture_scaling)
         local newImageData = love.image.newImageData(w, h)
@@ -68,12 +74,12 @@ local function output_image(card)
         local canvas = love.graphics.newCanvas(w, h, {type = '2d', readable = true})
         newImageData:paste(G.ASSET_ATLAS[card.atlas].image_data, 0, 0, card.pos.x * w, card.pos.y * h, w, h)
         if card.soul_pos then
-            newImageDataSoul = love.image.newImageData(w, h)
-            newImageDataSoul:paste(G.ASSET_ATLAS[card.atlas].image_data, 0, 0, card.soul_pos.x * w, card.soul_pos.y * h, w, h)
             if card.soul_pos.extra then
                 newImageDataExtra = love.image.newImageData(w, h)
                 newImageDataExtra:paste(G.ASSET_ATLAS[card.atlas].image_data, 0, 0, card.soul_pos.extra.x * w, card.soul_pos.extra.y * h, w, h)
             end
+            newImageDataSoul = love.image.newImageData(w, h)
+            newImageDataSoul:paste(G.ASSET_ATLAS[card.atlas].image_data, 0, 0, card.soul_pos.x * w, card.soul_pos.y * h, w, h)
         end
 
         love.graphics.push()
@@ -83,10 +89,10 @@ local function output_image(card)
         love.graphics.setCanvas( canvas)
            love.graphics.draw(love.graphics.newImage(newImageData),0,0)
         if newImageDataSoul then
-            love.graphics.draw(love.graphics.newImage(newImageDataSoul), 0,0)
             if newImageDataExtra then
                 love.graphics.draw(love.graphics.newImage(newImageDataExtra), 0,0)
             end
+            love.graphics.draw(love.graphics.newImage(newImageDataSoul), 0,0)
         end
         love.graphics.setCanvas( prevcanvas )
         newImageData = canvas:newImageData( )
@@ -100,7 +106,7 @@ local function output_image(card)
 end
 
 local function output_rendered_image(card)
-    local file_path = "output/images/" .. card.config.center.key:gsub("?", "_") .. ".png"
+    local file_path = output_root .. "images/" .. card.config.center.key:gsub("?", "_") .. ".png"
     local w = 71 * G.SETTINGS.GRAPHICS.texture_scaling
     local h = 95 * G.SETTINGS.GRAPHICS.texture_scaling
 
@@ -138,6 +144,18 @@ local function output_rendered_image(card)
     canvas:newImageData():encode('png', file_path)
 end
 
+local function CheckForOverride(image_path)
+    local image_path_gif = image_path:gsub(".png", "_override.gif")
+    local image_path_png = image_path:gsub(".png", "_override.png")
+    if love.filesystem.exists(output_root .. image_path_gif) then
+        return image_path_gif
+    elseif love.filesystem.exists(output_root .. image_path_png) then
+        return image_path_png
+    else
+        return image_path
+    end
+end
+
 local function get_name_from_table(table)
     local name = ""
     for i,_ in ipairs(table)do
@@ -161,17 +179,60 @@ local function get_desc_from_table(desc_table)
             phrase = {}
             if desc_table[i][i2].nodes then
                 phrase["text"] = tostring(desc_table[i][i2].nodes[1].config.text)
-                phrase["colour"] = conver_to_hex(desc_table[i][i2].nodes[1].config.colour)
-                phrase["background_colour"] = conver_to_hex(desc_table[i][i2].config.colour)
+                phrase["colour"] = convert_to_hex(desc_table[i][i2].nodes[1].config.colour)
+                phrase["background_colour"] = convert_to_hex(desc_table[i][i2].config.colour)
             else
                 phrase["text"] = tostring(desc_table[i][i2].config.text)
-                phrase["colour"] = conver_to_hex(desc_table[i][i2].config.colour)
+                phrase["colour"] = convert_to_hex(desc_table[i][i2].config.colour)
             end
             table.insert(line, phrase)
         end
         table.insert(desc, line)
     end
     return desc
+end
+
+local function check_for_tags(card)
+    local tags = {}
+    ---- chcek for chips
+    if ((type(card.ability.chips) == "number") and (card.ability.chips > 0)) or
+       ((type(card.ability.t_chips) == "number") and (card.ability.t_chips > 0)) then
+            table.insert(tags,"chips")
+    end
+    if not (card.ability.extra == nil) and (type(card.ability.extra) == "table") and
+        ((type(card.ability.extra.current_chips) == "number")  and (card.ability.extra.current_chips > 0) or
+        ((type(card.ability.extra.chips) == "number")  and (card.ability.extra.chips > 0))) then
+            table.insert(tags,"chips")
+    end
+    ---- check for mult
+    if ((type(card.ability.mult) == "number") and (card.ability.mult > 0)) or
+       ((type(card.ability.t_mult) == "number") and (card.ability.t_mult > 0)) then
+            table.insert(tags,"mult")
+    end
+    if not (card.ability.extra == nil) and (type(card.ability.extra) == "table") and
+        ((type(card.ability.extra.s_mult) == "number")  and (card.ability.extra.s_mult > 0) or
+        ((type(card.ability.extra.mult) == "number")  and (card.ability.extra.mult > 0))) then
+            table.insert(tags,"mult")
+    end
+    ---- check for xmult
+    if ((type(card.ability.Xmult) == "number") and (card.ability.Xmult > 0)) or
+       ((type(card.ability.x_mult) == "number") and (card.ability.x_mult > 0)) then
+            table.insert(tags,"xmult")
+    end
+    if not (card.ability.extra == nil) and (type(card.ability.extra) == "table") and
+        (((type(card.ability.extra.Xmult) == "number")  and (card.ability.extra.Xmult > 0)) or
+        ((type(card.ability.extra.x_mult) == "number")  and (card.ability.extra.x_mult > 0))) then
+            table.insert(tags,"xmult")
+    end
+    ---- check for xchips
+    if not (card.ability.extra == nil) and (type(card.ability.extra) == "table") and
+        (((type(card.ability.extra.xchips) == "number")  and (card.ability.extra.xchips > 0)) or
+        ((type(card.ability.extra.X_chips) == "number")  and (card.ability.extra.X_chips > 0)) or
+        ((type(card.ability.extra.x_chips) == "number")  and (card.ability.extra.x_chips > 0))) then
+            table.insert(tags,"xchips")
+    end
+
+    return tags
 end
 
 local function process_joker(card, center)
@@ -198,11 +259,11 @@ local function process_joker(card, center)
     end
     item.key = center.key
     item.set = center.set
-    if center.mod then
+    if center.mod and center.mod.id ~= "Aura" and center.mod.id ~= "aure_spectral" then
         item.mod = center.mod.id
     end
-    item.tags = {}
-    item.image_url = "images/" .. center.key:gsub("?", "_") .. ".png"
+    item.tags = check_for_tags(card)
+    item.image_url = CheckForOverride("images/" .. center.key:gsub("?", "_") .. ".png")
     if item.name then
         sets["Joker"][item.key] = item
     end
@@ -220,11 +281,11 @@ local function process_consumable(card, center)
         end
         item.key = center.key
         item.set = center.set
-        if center.mod then
+        if center.mod and center.mod.id ~= "Aura" and center.mod.id ~= "aure_spectral" then
             item.mod = center.mod.id
         end
         item.tags = {}
-        item.image_url = "images/" .. center.key:gsub("?", "_") .. ".png"
+        item.image_url = CheckForOverride("images/" .. center.key:gsub("?", "_") .. ".png")
         if item.name then
             sets["Consumables"][item.set][item.key] = item
         end
@@ -239,11 +300,11 @@ local function process_other(card, center)
     end
     item.key = center.key
     item.set = center.set
-    if center.mod then
+    if center.mod and center.mod.id ~= "Aura" and center.mod.id ~= "aure_spectral" then
         item.mod = center.mod.id
     end
     item.tags = {}
-    item.image_url = "images/" .. center.key:gsub("?", "_") .. ".png"
+    item.image_url = CheckForOverride("images/" .. center.key:gsub("?", "_") .. ".png")
     if item.name then
         sets[item.set][item.key] = item
     end
@@ -263,11 +324,11 @@ local function process_playing_card(card, center, key)
     end
     item.key = key
     item.set = center.suit
-    if center.mod then
+    if center.mod and center.mod.id ~= "Aura" and center.mod.id ~= "aure_spectral" then
         item.mod = center.mod.id
     end
     item.tags = {}
-    item.image_url = "images/" .. key:gsub("?", "_") .. ".png"
+    item.image_url = CheckForOverride("images/" .. key:gsub("?", "_") .. ".png")
     if item.name then
         sets["PlayingCards"][item.set][item.key] = item
     end
@@ -314,11 +375,11 @@ local function process_blind(blind)
         end
         item.description = localize{type = 'raw_descriptions', key = blind.key, set = 'Blind', vars = loc_vars or blind.vars}
 
-        if blind.mod then
+        if blind.mod and blind.mod.id ~= "Aura" and blind.mod.id ~= "aure_spectral" then
             item.mod = blind.mod.id
         end
         item.tags = {}
-        item.image_url = "images/" .. blind.key:gsub("?", "_") .. ".png"
+        item.image_url = CheckForOverride("images/" .. blind.key:gsub("?", "_") .. ".png")
         if item.name then
             sets["Blind"][item.key] = item
         end
@@ -343,13 +404,13 @@ local function process_curse(curse)
             loc_vars = res.vars or {}
         end
         item.description = localize{type = 'descriptions', key = curse.key, set = curse.set, vars = loc_vars or {}, nodes = {}}
-        if curse.mod then
+        if curse.mod and curse.mod.id ~= "Aura" and curse.mod.id ~= "aure_spectral" then
             item.mod = curse.mod.id
         else
             item.mod = "JeffDeluxeConsumablesPack"
         end
         item.tags = {}
-        item.image_url = "images/" .. curse.key:gsub("?", "_") .. ".png"
+        item.image_url = CheckForOverride("images/" .. curse.key:gsub("?", "_") .. ".png")
         if item.name then
             sets["Curse"][item.key] = item
         end
@@ -373,11 +434,11 @@ local function process_d6_side(d6_side)
         if d6_side.loc_vars and type(d6_side.loc_vars) == "function" then loc_vars = d6_side:loc_vars({}, nil, dummy_d6_side) end
         item.name = localize{type = 'name_text', key = d6_side.key, set = 'Other'}
         item.description = localize{type = 'raw_descriptions', key = d6_side.key, set = 'Other', vars = loc_vars and loc_vars.vars or nil}
-        if d6_side.mod then
+        if d6_side.mod and d6_side.mod.id ~= "Aura" and d6_side.mod.id ~= "aure_spectral" then
             item.mod = d6_side.mod.id
         end
         item.tags = {}
-        item.image_url = "images/" .. d6_side.key:gsub("?", "_") .. ".png"
+        item.image_url = CheckForOverride("images/" .. d6_side.key:gsub("?", "_") .. ".png")
         if item.name then
             sets["D6 Side"][item.key] = item
         end
@@ -394,11 +455,11 @@ local function process_edition(card)
     end
     item.key = center.key
     item.set = center.set
-    if center.mod then
+    if center.mod and center.mod.id ~= "Aura" and center.mod.id ~= "aure_spectral" then
         item.mod = center.mod.id
     end
     item.tags = {}
-    item.image_url = "images/" .. center.key:gsub("?", "_") .. ".png"
+    item.image_url = CheckForOverride("images/" .. center.key:gsub("?", "_") .. ".png")
     if item.name then
         sets[item.set][item.key] = item
     end
@@ -414,11 +475,11 @@ local function process_enhancement(card)
     end
     item.key = center.key
     item.set = center.set
-    if center.mod then
+    if center.mod and center.mod.id ~= "Aura" and center.mod.id ~= "aure_spectral" then
         item.mod = center.mod.id
     end
     item.tags = {}
-    item.image_url = "images/" .. center.key:gsub("?", "_") .. ".png"
+    item.image_url = CheckForOverride("images/" .. center.key:gsub("?", "_") .. ".png")
     if item.name then
         sets[item.set][item.key] = item
     end
@@ -433,11 +494,11 @@ local function process_seal(card, seal)
     end
     item.key = seal.key
     item.set = seal.set
-    if seal.mod then
+    if seal.mod and seal.mod.id ~= "Aura" and seal.mod.id ~= "aure_spectral" then
         item.mod = seal.mod.id
     end
     item.tags = {}
-    item.image_url = "images/" .. seal.key:gsub("?", "_") .. ".png"
+    item.image_url = CheckForOverride("images/" .. seal.key:gsub("?", "_") .. ".png")
     if item.name then
         sets[item.set][item.key] = item
     end
@@ -453,7 +514,11 @@ local function process_stake(stake)
         local res = stake:loc_vars() or {}
         loc_vars = res.vars or {}
     end
+    if stake.mod and stake.mod.id ~= "Aura" and stake.mod.id ~= "aure_spectral" then
+        item.mod = stake.mod.id
+    end
     item.description = localize{type = 'raw_descriptions', key = stake.key, set = "Stake", nodes = {}, vars = loc_vars}
+    item.image_url = CheckForOverride("images/" .. stake.key:gsub("?","_") .. ".png")
     if item.name then
         sets["Stake"][item.key] = item
     end
@@ -485,7 +550,7 @@ local function process_sticker(center)
         item.mod = center.mod.id
     end
     item.tags = {}
-    item.image_url = "images/" .. center.key:gsub("?", "_") .. ".png"
+    item.image_url = CheckForOverride("images/" .. center.key:gsub("?", "_") .. ".png")
     if item.name then
         sets["Sticker"][item.key] = item
         print(tprint(item))
@@ -494,6 +559,7 @@ end
 
 local function process_tag(tag)
     local item = {}
+    tag.set = "Tag"
     output_image(tag)
     if tag.tag_sprite.ability_UIBox_table then
        item.name = get_name_from_table(tag.tag_sprite.ability_UIBox_table.name)
@@ -501,11 +567,11 @@ local function process_tag(tag)
     end
     item.key = tag.key
     item.set = tag.set
-    if tag.mod then
+    if tag.mod and tag.mod.id ~= "Aura" and tag.mod.id ~= "aure_spectral" then
         item.mod = tag.mod.id
     end
     item.tags = {}
-    item.image_url = "images/" .. tag.key:gsub("?", "_") .. ".png"
+    item.image_url = CheckForOverride("images/" .. tag.key:gsub("?", "_") .. ".png")
     if item.name then
         sets["Tag"][item.key] = item
     end
@@ -515,7 +581,7 @@ local function process_suit(suit)
     local item = {}
     item.name = G.localization.misc.suits_plural[suit.key]
     item.key = suit.key
-    if suit.mod then
+    if suit.mod and suit.mod.id ~= "Aura" and suit.mod.id ~= "aure_spectral" then
         item.mod = suit.mod.id
     end
     if item.name then
@@ -528,7 +594,7 @@ local function process_mod(mod)
     item.name = mod.display_name
     item.id = mod.id
     item.description = mod.description
-    item.badge_colour = conver_to_hex(mod.badge_colour)
+    item.badge_colour = convert_to_hex(mod.badge_colour)
     if item.name then
         sets["Mods"][item.id] = item
     end
@@ -645,11 +711,11 @@ end
 
 G.FUNCS.create_output = function(e)
     local card = nil
-    if not love.filesystem.exists("output") then
-        love.filesystem.createDirectory("output")
+    if not love.filesystem.exists(output_root) then
+        love.filesystem.createDirectory(output_root)
     end
-    if not love.filesystem.exists("output/images") then
-        love.filesystem.createDirectory("output/images")
+    if not love.filesystem.exists(output_root .. "images") then
+        love.filesystem.createDirectory(output_root .. "images")
     end
 
     for k,v in pairs(G.P_CENTERS) do
@@ -781,12 +847,13 @@ G.FUNCS.create_output = function(e)
         process_mod(v)
     end
 
-    print("complete")
     local output = json.encode(sets)
-    if love.filesystem.exists("output/cards.json") then
-        love.filesystem.remove("output/cards.json")
+    if love.filesystem.exists(output_root .. "cards.json") then
+        love.filesystem.remove(output_root .. "cards.json")
     end
-    love.filesystem.write("output/cards.js", "cards = " .. output:gsub("'","\\'"))   --outputting to js file/object to get around browser security annoyances
+    love.filesystem.write(output_root .. "cards.js", "cards = " .. output:gsub("'","\\'"))   --outputting to js file/object to get around browser security annoyances
+    copy_template()
+    print("complete")
 end
 
 -------------------------------------------------
