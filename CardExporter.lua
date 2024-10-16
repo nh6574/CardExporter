@@ -720,6 +720,7 @@ G.FUNCS.create_output = function(e)
 
     for k,v in pairs(G.P_CENTERS) do
         print("Processing " .. k .. " | " .. tostring(v.set))
+	v.unlocked = true
         v.discovered = true
         if v.set == "Edition" then
             card = Card(G.jokers.T.x + G.jokers.T.w/2, G.jokers.T.y, G.CARD_W, G.CARD_H, G.P_CARDS.empty, v)
