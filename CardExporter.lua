@@ -87,7 +87,7 @@ local function output_image(card)
         love.graphics.setColor( 255, 255, 255, 255 )
         canvas = love.graphics.newCanvas(w, h)
         love.graphics.setCanvas( canvas)
-           love.graphics.draw(love.graphics.newImage(newImageData),0,0)
+        love.graphics.draw(love.graphics.newImage(newImageData),0,0)
         if newImageDataSoul then
             if newImageDataExtra then
                 love.graphics.draw(love.graphics.newImage(newImageDataExtra), 0,0)
@@ -142,6 +142,62 @@ local function output_rendered_image(card)
         love.filesystem.remove(file_path)
     end
     canvas:newImageData():encode('png', file_path)
+end
+
+local function output_image_2(card)
+    if not card.atlas and card.set then
+        card.atlas = card.set
+    end
+    if G.ASSET_ATLAS and G.ASSET_ATLAS[card.atlas] and not G.ASSET_ATLAS[card.atlas].image_data then
+        for _,j in ipairs(G.asset_atli) do
+            if j.name == card.set then
+                local sprite_path = j.path
+                G.ASSET_ATLAS[card.atlas].image_data = love.image.newImageData(sprite_path)
+            end
+        end
+    end
+    print(tostring(G.ASSET_ATLAS[card.atlas]))
+    print(tostring(G.ASSET_ATLAS[card.atlas].image_data))
+    if G.ASSET_ATLAS and G.ASSET_ATLAS[card.atlas] and G.ASSET_ATLAS[card.atlas].image_data then
+        local file_path = output_root .. "images/" .. card.config.center.key:gsub("?", "_") .. ".png"
+        local w = (G.ASSET_ATLAS[card.atlas].px * G.SETTINGS.GRAPHICS.texture_scaling)
+        local h = (G.ASSET_ATLAS[card.atlas].py * G.SETTINGS.GRAPHICS.texture_scaling)
+        local newImageData = love.image.newImageData(w, h)
+        local newImageDataSoul = nil
+        local newImageDataExtra = nil
+
+        local canvas = love.graphics.newCanvas(w, h, {type = '2d', readable = true})
+        newImageData:paste(G.ASSET_ATLAS[card.atlas].image_data, 0, 0, card.pos.x * w, card.pos.y * h, w, h)
+        if card.soul_pos then
+            newImageDataSoul = love.image.newImageData(w, h)
+            newImageDataSoul:paste(G.ASSET_ATLAS[card.atlas].image_data, 0, 0, card.soul_pos.x * w, card.soul_pos.y * h, w, h)
+            if card.soul_pos.extra then
+                newImageDataExtra = love.image.newImageData(w, h)
+                newImageDataExtra:paste(G.ASSET_ATLAS[card.atlas].image_data, 0, 0, card.soul_pos.extra.x * w, card.soul_pos.extra.y * h, w, h)
+            end
+        end
+
+        love.graphics.push()
+        local prevcanvas = love.graphics.getCanvas()
+        love.graphics.setColor( 255, 255, 255, 255 )
+        canvas = love.graphics.newCanvas(w, h)
+        love.graphics.setCanvas( canvas)
+           love.graphics.draw(love.graphics.newImage(newImageData),0,0)
+        if newImageDataSoul then
+            love.graphics.draw(love.graphics.newImage(newImageDataSoul), 0,0)
+            if newImageDataExtra then
+                love.graphics.draw(love.graphics.newImage(newImageDataExtra), 0,0)
+            end
+        end
+        love.graphics.setCanvas( prevcanvas )
+        newImageData = canvas:newImageData( )
+        love.graphics.pop()
+
+        if love.filesystem.exists(file_path) then
+            love.filesystem.remove(file_path)
+        end
+        newImageData:encode("png", file_path)
+    end
 end
 
 local function CheckForOverride(image_path)
@@ -215,12 +271,14 @@ local function check_for_tags(card)
             table.insert(tags,"mult")
     end
     ---- check for xmult
-    if ((type(card.ability.Xmult) == "number") and (card.ability.Xmult > 0)) or
-       ((type(card.ability.x_mult) == "number") and (card.ability.x_mult > 0)) then
+    if  ((type(card.ability.Xmult) == "number") and (card.ability.Xmult > 1)) or
+        ((type(card.ability.xmult) == "number") and (card.ability.xmult > 1)) or
+        ((type(card.ability.x_mult) == "number") and (card.ability.x_mult > 1)) then
             table.insert(tags,"xmult")
     end
     if not (card.ability.extra == nil) and (type(card.ability.extra) == "table") and
         (((type(card.ability.extra.Xmult) == "number")  and (card.ability.extra.Xmult > 0)) or
+        ((type(card.ability.extra.xmult) == "number")  and (card.ability.extra.xmult > 0)) or
         ((type(card.ability.extra.x_mult) == "number")  and (card.ability.extra.x_mult > 0))) then
             table.insert(tags,"xmult")
     end
@@ -253,7 +311,8 @@ local function process_joker(card, center)
         badges[1].nodes[1].nodes[2].config.object.config.string[1] then
         custom_rarity = badges[1].nodes[1].nodes[2].config.object.config.string[1]
     end
-    item.rarity = ({localize('k_common'), localize('k_uncommon'), localize('k_rare'), localize('k_legendary'), localize('k_fusion'), ['cry_epic'] = 'Epic', ['cry_exotic'] = 'Exotic', ['cere_divine'] = 'Divine', ['evo'] = 'Evolved'})[center.rarity]
+    item.rarity = ({localize('k_common'), localize('k_uncommon'), localize('k_rare'), localize('k_legendary'), localize('k_fusion'), 
+        ['cry_epic'] = 'Epic', ['cry_exotic'] = 'Exotic', ['cere_divine'] = 'Divine', ['evo'] = 'Evolved', ['poke_safari'] = 'Safari'})[center.rarity]
     if custom_rarity ~= "" then
         item.rarity = custom_rarity
     end
@@ -270,10 +329,11 @@ local function process_joker(card, center)
 end
 
 local function process_consumable(card, center)
-    if not sets["Consumables"][center.set] then
-        sets["Consumables"][center.set] = {}
+    local set_name = G.localization.misc.dictionary[center.set] or center.set
+    if not sets["Consumables"][set_name] then
+        sets["Consumables"][set_name] = {}
     end
-    if not sets["Consumables"][center.set][center.key] then
+    if not sets["Consumables"][set_name][center.key] then
         local item = {}
         if card.ability_UIBox_table then
             item.name = get_name_from_table(card.ability_UIBox_table.name)
@@ -287,7 +347,7 @@ local function process_consumable(card, center)
         item.tags = {}
         item.image_url = CheckForOverride("images/" .. center.key:gsub("?", "_") .. ".png")
         if item.name then
-            sets["Consumables"][item.set][item.key] = item
+            sets["Consumables"][set_name][item.key] = item
         end
     end
 end
@@ -420,10 +480,10 @@ end
 local function process_d6_side(d6_side)
     local item = {}
     output_image(d6_side)
-    if not sets["D6 Sides"] then
-        sets["D6 Sides"] = {}
+    if not sets["D6 Side"] then
+        sets["D6 Side"] = {}
     end
-    if not sets["D6 Sides"][d6_side.key] then
+    if not sets["D6 Side"][d6_side.key] then
         item.key = d6_side.key
         local loc_vars = nil
         local dummy_d6_side = {
@@ -608,53 +668,6 @@ Card.hover = function(self)
     end
 end
 
-local function format_desc(item)
-    local desc_string = "text: [\r\n"
-    if item then
-        for _,v in pairs(item) do
-            desc_string = desc_string .. "\"" .. tostring(v) .. "\",\r\n"
-        end
-    end
-    desc_string = desc_string .. "],\r\n"
-    return desc_string
-end
-
-local function format_item(item)
-    local item_string = "{\r\n"
-    item_string = item_string .. "name: \"" .. tostring(item.name) .. "\",\r\n"
-    item_string = item_string .. "image_url: \"" .. tostring(item.image_url) .. "\",\r\n"
-    item_string = item_string .. "rarity: " .. tostring(item.rarity) .. ",\r\n"
-    item_string = item_string .. "mod: " .. tostring(item.mod) .. ",\r\n"
-    item_string = item_string .. format_desc(item.description)
-    item_string = item_string .. "},\r\n"
-    return item_string
-end
-
-local function format_consumable(key, set)
-    local set_string = key .. " = [\r\n"
-    for _,v in pairs(set) do
-        set_string = set_string .. format_item(v)
-    end
-    set_string = set_string .. "]\r\n\r\n"
-    return set_string
-end
-
-local function format_set(key, set)
-    local set_string = "let " .. key .. " = [\r\n"
-    if key == "Consumables" then
-        for k,c in pairs(set) do
-            set_string = set_string .. format_consumable(k,c)
-        end
-    else
-        for _,v in pairs(set) do
-            set_string = set_string .. format_item(v)
-        end
-    end
-    set_string = set_string .. "]\r\n\r\n"
-    return set_string
-end
-
-
 local createOptionsRef = create_UIBox_options
 function create_UIBox_options()
     local contents = createOptionsRef()
@@ -705,8 +718,43 @@ function config_export_tab()
         },
         nodes = {
             UIBox_button({label = {"Export Cards"}, button = "create_output", colour = G.C.ORANGE, minw = 5, minh = 0.7, scale = 0.6}),
+            UIBox_button({label = {"Test Shader"}, button = "test_shader", colour = G.C.ORANGE, minw = 5, minh = 0.7, scale = 0.6}),
         },
     }
+end
+
+G.FUNCS.test_shader = function(e)
+    local w = 71 * G.SETTINGS.GRAPHICS.texture_scaling
+    local h = 95 * G.SETTINGS.GRAPHICS.texture_scaling
+    local card = G.jokers.cards[1]
+
+    local canvas = love.graphics.newCanvas(w, h, {type = '2d', readable = true})
+    love.graphics.push()
+    local oldCanvas = love.graphics.getCanvas()
+    love.graphics.setCanvas( canvas )
+
+    love.graphics.clear(0,0,0,0)
+    love.graphics.setColor(1, 1, 1, 1)
+
+    if card.edition and card.edition.type and G.SHADERS[card.edition.type]  then
+        love.graphics.setShader(G.SHADERS[card.edition.type])
+    else
+        if card.edition then
+            local edition_key = card.edition.key
+            if edition_key and SMODS.Centers[edition_key] and G.SHADERS[SMODS.Centers[edition_key].shader] then
+                love.graphics.setShader(G.SHADERS[SMODS.Centers[edition_key].shader])
+            end
+        end
+    end
+    love.graphics.draw(
+        card.children.center.atlas.image,
+        card.children.center.sprite,
+        0,0,0,2,2
+    )
+
+    --love.graphics.setShader()
+   -- love.graphics.setCanvas(oldCanvas)
+   -- love.graphics.pop()
 end
 
 G.FUNCS.create_output = function(e)
@@ -720,7 +768,7 @@ G.FUNCS.create_output = function(e)
 
     for k,v in pairs(G.P_CENTERS) do
         print("Processing " .. k .. " | " .. tostring(v.set))
-	v.unlocked = true
+        v.unlocked = true
         v.discovered = true
         if v.set == "Edition" then
             card = Card(G.jokers.T.x + G.jokers.T.w/2, G.jokers.T.y, G.CARD_W, G.CARD_H, G.P_CARDS.empty, v)

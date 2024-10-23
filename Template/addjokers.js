@@ -1,88 +1,3 @@
-
-// works the same. 
-//let consumables = [
-  // {
-  //   name: "Joker",
-  //   text: [
-  //     "{C:mult}+4{} Mult"
-  //   ],
-  //   image_url: "img/j_joker.png",
-  //   rarity: "Tarot"
-  // },
-  // {
-  //   name: "Joker",
-  //   text: [
-  //     "{C:mult}+4{} Mult"
-  //   ],
-  //   image_url: "img/j_joker.png",
-  //   rarity: "Planet"
-  // },
-  // {
-  //   name: "Joker",
-  //   text: [
-  //     "{C:mult}+4{} Mult"
-  //   ],
-  //   image_url: "img/j_joker.png",
-  //   rarity: "Spectral"
-  // },
-//]
-
-
-let decks = [
-  // {
-  //   name: "Joker",
-  //   text: [
-  //     "{C:mult}+4{} Mult"
-  //   ],
-  //   image_url: "img/j_joker.png",
-  //   rarity: "Deck"
-  // },
-]
-
-
-let cols = {
-  
-  MULT: "#FE5F55",
-  CHIPS: "#009dff",
-  MONEY: "#f3b958",
-  XMULT: "#FE5F55",
-  FILTER: "#ff9a00",
-  ATTENTION: "#ff9a00",
-  BLUE: "#009dff",
-  RED: "#FE5F55",
-  GREEN: "#4BC292",
-  PALE_GREEN: "#56a887",
-  ORANGE: "#fda200",
-  IMPORTANT: "#ff9a00",
-  GOLD: "#eac058",
-  YELLOW: "#ffff00",
-  CLEAR: "#00000000", 
-  WHITE: "#ffffff",
-  PURPLE: "#8867a5",
-  BLACK: "#374244",
-  L_BLACK: "#4f6367",
-  GREY: "#5f7377",
-  CHANCE: "#4BC292",
-  JOKER_GREY: "#bfc7d5",
-  VOUCHER: "#cb724c",
-  BOOSTER: "#646eb7",
-  EDITION: "#ffffff",
-  DARK_EDITION: "#5d5dff",
-  ETERNAL: "#c75985",
-  INACTIVE: "#ffffff99",
-  HEARTS: "#f03464",
-  DIAMONDS: "#f06b3f",
-  SPADES: "#403995",
-  CLUBS: "#235955",
-  ENHANCED: "#8389DD",
-  JOKER: "#708b91",
-  TAROT: "#a782d1",
-  PLANET: "#13afce",
-  SPECTRAL: "#4584fa",
-  VOUCHER: "#fd682b",
-  EDITION: "#4ca893",
-}
-
 let rarities = {
   "Common": "#009dff", 
   "Uncommon": "#4BC292",
@@ -116,6 +31,7 @@ let rarities = {
   "Exotic": "#708b91",
   "Fallen": "#8867a5",
   "Divine": "#000000",
+  "Safari" : "#F2C74E"
 }
 
 
@@ -147,6 +63,45 @@ let process_description = (description) => {
   }
 
   return desc_html += "</div>";
+}
+
+function process_tags(tags){
+  var tag_div = ""
+  if (typeof tags !== 'undefined' && tags.length > 0) {
+    var chips = false
+    var mult = false
+    var xchips = false
+    var xmult = false
+    tag_div = "<div>"
+    for (i = 0; i < tags.length; i++) {
+      if (tags[i] == "mult"){
+        mult = true
+      }
+      if (tags[i] == "chips"){
+        chips = true
+      }
+      if (tags[i] == "xmult"){
+        xmult = true
+      }
+      if (tags[i] == "xchips"){
+        xchips = true
+      }
+    }
+    if (mult){
+      tag_div += '<span class="plus" style="color: red" >+</span>'
+    }
+    if (xmult){
+      tag_div += '<span class="mult" style="background-color: red" >X</span>'
+    }
+    if (chips){
+      tag_div += '<span class="plus" style="color: blue" >+</span>'
+    }
+    if (xchips){
+      tag_div += '<span class="mult" style="background-color: blue" >X</span>'
+    }
+    tag_div += "</div>"
+  }
+  return tag_div;
 }
 
 function CheckForOverride(url)
@@ -186,16 +141,17 @@ let add_cards_to_div = (jokers, jokers_div) => {
     if (joker.rarity === "Sticker" || joker.rarity == "Seal") {
       joker_div.innerHTML = `
         <h3>${joker.name}</h3>
-        <img src="${joker.image_url}" alt="${joker.name}" class="hasback" />
+        <img loading="lazy" src="${joker.image_url}" alt="${joker.name}" class="hasback" />
         ${CheckForRarity(joker)}
         ${process_description(joker.description)}
       `;
     } else {
       joker_div.innerHTML = `
         <h3>${joker.name}</h3>
-        <img src="${joker.image_url}" alt="${joker.name}" />
+        <img loading="lazy" src="${joker.image_url}" alt="${joker.name}" />
         ${CheckForRarity(joker)}
         ${process_description(joker.description)}
+        ${process_tags(joker.tags)}
       `;
     }
     if (joker.mod){
@@ -270,13 +226,25 @@ add_cards_to_div(cards["D6 Side"], d6sides_div);
 let suits_div = document.querySelector(".suits");
 add_cards_to_div(cards.Suit, suits_div);
 
+if (cards.Sleeve.length == 0) {
+  w3AddClass(document.querySelector(".sleevesbtn"), "hide")
+}
 
+if (cards.Skill.length == 0) {
+  w3AddClass(document.querySelector(".skillsbtn"), "hide")
+}
 
+if (cards.Curse.length == 0) {
+  w3AddClass(document.querySelector(".cursesbtn"), "hide")
+}
 
+if (cards.Contract.length == 0) {
+  w3AddClass(document.querySelector(".contractsbtn"), "hide")
+}
 
-
-
-
+if (cards["D6 Side"].length == 0) {
+  w3AddClass(document.querySelector(".d6sidesbtn"), "hide")
+}
 
 filterSelection("jokersfull")
 function filterSelection(c) {
