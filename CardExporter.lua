@@ -787,15 +787,18 @@ end
 
 local function filterListFromString(str)
     str = string.gsub(str, " ", "")
-    --str = string.lower(str)
-    str = string.split(str) --remove spaces from filter and separate via commas for compat with above functions
-    return str
+    local result = {}
+    for match in (str .. ","):gmatch("(.-),") do
+        table.insert(result, match)
+    end
+    return result
 end
 
 G.FUNCS.create_output = function(e)
     local mod_filter = filterListFromString(G.EXPORT_FILTER or "")
     local clean_filter = {}
-    if #mod_filter == 0 then
+    print(tprint(mod_filter))
+    if #mod_filter == 1 and mod_filter[1] == "" then
         table.insert(clean_filter, "Balatro")
         for k,_ in pairs(SMODS.Mods) do
             table.insert(clean_filter, k)
