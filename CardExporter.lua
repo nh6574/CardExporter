@@ -311,7 +311,7 @@ local function process_joker(card, center)
         badges[1].nodes[1].nodes[2].config.object.config.string[1] then
         custom_rarity = badges[1].nodes[1].nodes[2].config.object.config.string[1]
     end
-    item.rarity = ({localize('k_common'), localize('k_uncommon'), localize('k_rare'), localize('k_legendary'), localize('k_fusion'), 
+    item.rarity = ({localize('k_common'), localize('k_uncommon'), localize('k_rare'), localize('k_legendary'), localize('k_fusion'),
         ['cry_epic'] = 'Epic', ['cry_exotic'] = 'Exotic', ['cere_divine'] = 'Divine', ['evo'] = 'Evolved', ['poke_safari'] = 'Safari'})[center.rarity]
     if custom_rarity ~= "" then
         item.rarity = custom_rarity
@@ -330,6 +330,7 @@ end
 
 local function process_consumable(card, center)
     local set_name = G.localization.misc.dictionary[center.set] or center.set
+    set_name = set_name:gsub(" ","_")
     if not sets["Consumables"][set_name] then
         sets["Consumables"][set_name] = {}
     end
@@ -340,7 +341,7 @@ local function process_consumable(card, center)
             item.description = get_desc_from_table(card.ability_UIBox_table.main)
         end
         item.key = center.key
-        item.set = center.set
+        item.set = center.set:gsub(" ","_")
         if center.mod and center.mod.id ~= "Aura" and center.mod.id ~= "aure_spectral" then
             item.mod = center.mod.id
         end
@@ -1008,6 +1009,13 @@ G.FUNCS.create_output = function(e)
             process_suit(v)
         end
     end
+
+    local base_mod = {
+        display_name = "Balatro",
+        id = "Balatro",
+        badge_colour = G.C.RED
+    }
+    process_mod(base_mod)
 
     for k,v in pairs(SMODS.Mods) do
         if table.contains(clean_filter, k) then
