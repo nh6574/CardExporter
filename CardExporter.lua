@@ -8,7 +8,7 @@
 ----------------------------------------------
 ------------MOD CODE -------------------------
 
-SMODS.load_file("Mods/CardExporter/ca.lua")() --third party json library
+SMODS.load_file("ca.lua")() --third party json library
 local json = require "json"
 
 local output_root = "output/"
