@@ -12,7 +12,6 @@ SMODS.load_file("ca.lua")() --third party json library
 local json = require "json"
 
 local output_root = "output/"
-local copy_command = 'xcopy "Mods\\CardExporter\\Template" "' .. output_root .. '" /Y /S /I'
 local output_images = true
 local output_on_hover = false
 
@@ -38,10 +37,6 @@ sets["Mods"] = {}
 sets["PlayingCards"] = {}
 sets["Suit"] = {}
 
-local function copy_template()
-    os.execute(copy_command)
-end
-
 local function convert_to_hex(colour_table)
     if not colour_table then return end
     local colour = "#" ..
@@ -64,7 +59,9 @@ local function output_image(card)
         end
     end
     if output_images and G.ASSET_ATLAS and G.ASSET_ATLAS[card.atlas] and G.ASSET_ATLAS[card.atlas].image_data then
-        local file_path = output_root .. "images/" .. card.key:gsub("?", "_") .. ".png"
+        if card.set == "Booster" then card.set = "Other" end
+        local has_loc = not (not G.localization.descriptions[card.set][card.key])
+        local file_path = output_root .. "images/" .. (has_loc and G.localization.descriptions[card.set][card.key].name or card.key) .. " (" .. (card.mod and (card.mod.id == "Balatro" and "Balatro" or SMODS.Mods[card.mod.id].name) or "") .. ").png"
         local w = (G.ASSET_ATLAS[card.atlas].px * G.SETTINGS.GRAPHICS.texture_scaling)
         local h = (G.ASSET_ATLAS[card.atlas].py * G.SETTINGS.GRAPHICS.texture_scaling)
         local newImageData = love.image.newImageData(w, h)
@@ -1029,7 +1026,6 @@ G.FUNCS.create_output = function(e)
         love.filesystem.remove(output_root .. "cards.json")
     end
     love.filesystem.write(output_root .. "cards.js", "cards = " .. output:gsub("'","\\'"))   --outputting to js file/object to get around browser security annoyances
-    copy_template()
     print("complete")
 end
 
